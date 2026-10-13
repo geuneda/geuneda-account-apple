@@ -1,0 +1,16 @@
+{
+  "name": "com.geuneda.account.apple",
+  "displayName": "Geuneda Account Apple",
+  "author": "geuneda",
+  "version": "0.1.0",
+  "unity": "2021.3",
+  "license": "MIT",
+  "description": "com.geuneda.account 의 Sign in with Apple 제공자입니다. iOS 의 AuthenticationServices 를 쓰는 자체 플러그인(외부 SDK 없음)으로 애플 id 토큰을 받고, iOS 빌드에 Sign in with Apple capability 를 넣습니다. 이 패키지를 설치한 게임에만 네이티브 코드와 capability 가 들어갑니다.",
+  "type": "library",
+  "hideInEditor": false,
+  "dependencies": {
+    "com.geuneda.account": "0.1.0",
+    "com.geuneda.core": "0.2.0",
+    "com.cysharp.unitask": "2.5.10"
+  }
+}

@@ -28,7 +28,7 @@ using Geuneda.Account.Apple;
 
 options.Providers.Add(new AppleAuthProvider());
 
-// 로그인 버튼에서(앱이 전면에 있을 때)
+// 로그인 버튼에서(앱이 전면에 있을 때). AuthService 가 먼저 인증 서버에서 nonce 를 받아 넘긴다
 var result = await auth.SignInAsync(AccountPlatforms.Apple, token);
 ```
 
@@ -47,6 +47,8 @@ builder.Services.AddGeunedaAccount(...).AddApple(options => options.Audiences.Ad
 ## 동작
 
 - iOS 13 이상에서 애플 로그인 시트를 띄웁니다. 이름·이메일은 요청하지 않습니다(서버는 애플 사용자 고유 ID `sub` 로 계정을 찾음).
+- id 토큰은 인증 서버가 발급한 nonce 에 묶습니다(replay 방어). `AuthService` 가 넘긴 nonce 원문의 SHA-256 16진 소문자를 애플 요청(`ASAuthorizationAppleIDRequest.nonce`)에 넣고, 애플은 그 값을 id 토큰의 `nonce` 클레임에 그대로 넣습니다. 원문은 `AuthService` 가 로그인 요청에 담아 서버로 보내고, 서버(`AppleIdTokenVerifier`)는 원문을 해시해 비교한 뒤 그 nonce 를 소비합니다. 그래서 같은 id 토큰을 다시 보내면 `InvalidNonce` 입니다.
+- `IAuthProvider` 로 직접 부를 때는 `SignInAsync(nonce, token)` 에 서버 nonce 를 넘겨야 합니다(비면 `ArgumentException`). 보통은 `AuthService` 를 통해 씁니다.
 - 사용자가 닫으면 `ResultCodes.Cancelled`, 그 밖의 실패(설정 안 됨, Apple 계정 없음 등)는 `AccountResultCodes.PlatformSignInFailed` 입니다. 메시지에 `ASAuthorizationError` 코드가 들어 있습니다.
 - `SignInAsync` 의 취소 토큰을 취소하면 결과는 바로 `Cancelled` 이고, iOS 16 이상은 시트도 닫습니다.
 - iOS 가 아니면(에디터, Android 등) `PlatformSignInFailed` 입니다. Android 에서 애플 로그인은 지원하지 않습니다.
@@ -55,7 +57,7 @@ builder.Services.AddGeunedaAccount(...).AddApple(options => options.Audiences.Ad
 ## 요구 사항
 
 - Unity 2021.3 이상, iOS 13 이상(그 아래는 실패 결과)
-- `com.geuneda.account` 0.1.0, `com.geuneda.core` 0.2.0, `com.cysharp.unitask` 2.5.10
+- `com.geuneda.account` 0.3.0(nonce 를 받는 인증 서버도 0.3.0), `com.geuneda.core` 0.2.0, `com.cysharp.unitask` 2.5.10
 
 변경 이력은 [CHANGELOG.md](CHANGELOG.md) 를 참고하세요.
 

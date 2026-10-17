@@ -29,15 +29,16 @@ namespace Geuneda.Account.Apple
 		private IntPtr _context;
 
 		[DllImport("__Internal")]
-		private static extern void GeunedaAppleSignIn_Start(IntPtr context, CompletionCallback callback);
+		private static extern void GeunedaAppleSignIn_Start(IntPtr context, string nonce, CompletionCallback callback);
 
 		[DllImport("__Internal")]
 		private static extern void GeunedaAppleSignIn_Cancel(IntPtr context);
 
-		public async UniTask<Result<PlatformCredential>> StartAsync(CancellationToken cancellationToken)
+		/// <param name="requestNonce">애플 요청에 넣을 nonce(서버 nonce 원문의 SHA-256 16진 소문자). id 토큰의 <c>nonce</c> 클레임이 됩니다.</param>
+		public async UniTask<Result<PlatformCredential>> StartAsync(string requestNonce, CancellationToken cancellationToken)
 		{
 			_context = GCHandle.ToIntPtr(GCHandle.Alloc(this));
-			GeunedaAppleSignIn_Start(_context, Completed);
+			GeunedaAppleSignIn_Start(_context, requestNonce, Completed);
 
 			// 취소는 아무 스레드에서나 올 수 있어 UIKit 을 부르는 취소는 메인 스레드로 넘긴다
 			using (cancellationToken.Register(() => MainThreadDispatcher.Post(Cancel)))

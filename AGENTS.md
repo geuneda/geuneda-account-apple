@@ -11,7 +11,8 @@
 
 | 파일 | 역할 |
 |------|------|
-| `Runtime/AppleAuthProvider.cs` | 공개 제공자. iOS 플레이어가 아니면 실패 결과 |
+| `Runtime/AppleAuthProvider.cs` | 공개 제공자. `RequiresNonce` true, nonce 가 비면 예외, iOS 플레이어가 아니면 실패 결과 |
+| `Runtime/AppleNonce.cs` | 서버 nonce 원문 → 애플 요청 nonce(SHA-256 16진 소문자). 서버 `OneTimeValues.Hash` 와 같은 값 |
 | `Runtime/AppleSignInRequest.cs` | `#if UNITY_IOS && !UNITY_EDITOR`. 요청 하나. GCHandle 을 네이티브 context 로 넘기고 네이티브 콜백에서만 풂 |
 | `Runtime/AppleSignInResults.cs`, `AppleSignInStatus.cs` | 네이티브 상태 → 결과 코드(에디터 테스트 대상) |
 | `Runtime/Plugins/iOS/GeunedaAppleSignIn.mm` | ASAuthorizationController. meta: iOS 만, `CompileFlags: -fobjc-arc`, `FrameworkDependencies: AuthenticationServices;` |
@@ -25,8 +26,9 @@
 - **늦은 취소 무시**: 네이티브 콜백이 오면 C# 이 `_context` 를 0 으로 바꾸고, `Cancel` 은 0 이면 아무것도 하지 않습니다. 완료 결과와 취소가 함께 메인 스레드 큐에 들어간 뒤 완료 처리에서 다시 로그인하면, 이전 요청의 취소가 같은 GCHandle 값을 받은 새 요청을 취소하는 것을 막습니다.
 - **취소**: 취소 콜백은 아무 스레드에서나 오므로 `MainThreadDispatcher.Post` 로 메인 스레드에서 네이티브 취소를 부릅니다. 네이티브는 요청을 취소로 끝내 콜백(핸들 해제)하고, iOS 16 이상은 `[controller cancel]` 로 시트를 닫고 요청을 놓습니다. 그 아래는 시트를 닫을 방법이 없어 위임이 올 때까지 요청을 붙잡아 둡니다. 결과는 그 자리에서 `Cancelled` 입니다.
 - 상태 값(0 성공, 1 취소, 2 실패, 3 미지원)은 C# enum 과 .mm 이 같아야 합니다.
+- **nonce**: C# 이 서버 nonce 원문을 `AppleNonce.Hash`(SHA-256 UTF-8 16진 소문자)로 바꿔 `GeunedaAppleSignIn_Start(context, nonce, callback)` 에 넘기고, .mm 이 `ASAuthorizationAppleIDRequest.nonce` 에 넣습니다. 원문은 앱 밖(애플)으로 보내지 않습니다. 해시 형식은 서버 `AppleIdTokenVerifier`(account 의 `OneTimeValues.Hash`)와 같아야 하므로 바꾸면 양쪽을 함께 바꿉니다(테스트 벡터 `raw-nonce-value` 가 양쪽에 있음).
 
 ## 4. 테스트
 
-- `Tests/EditMode/AppleAuthProviderTest.cs`: 상태 → 코드 변환, 에디터에서 실패 결과·로그아웃 없음, 이미 취소된 토큰.
+- `Tests/EditMode/AppleAuthProviderTest.cs`: 상태 → 코드 변환, 에디터에서 실패 결과·로그아웃 없음, 이미 취소된 토큰, nonce 누락 예외, 요청 nonce 해시(서버와 같은 테스트 벡터).
 - 기기: 플러그인 컴파일·entitlements·호출 경로는 iOS 시뮬레이터에서 확인했습니다(2026-10-14: Apple 계정 없는 시뮬레이터에서 시스템 "Apple 계정에 로그인" 알림까지 도달, 8초 뒤 취소 → `Cancelled`). 실제 로그인은 Sign in with Apple 을 켠 App ID 와 기기(또는 Apple 계정에 로그인한 시뮬레이터)가 필요합니다.

@@ -1,3 +1,4 @@
+using System;
 using System.Threading;
 using Cysharp.Threading.Tasks;
 using Geuneda.Core;
@@ -12,7 +13,8 @@ namespace Geuneda.Account.Apple
 	/// </summary>
 	/// <remarks>
 	/// <para>
-	/// 이름·이메일은 요청하지 않습니다(서버는 <c>sub</c> 로 계정을 찾음). 사용자가 시트를 닫으면 <c>ResultCodes.Cancelled</c>,
+	/// 이름·이메일은 요청하지 않습니다(서버는 <c>sub</c> 로 계정을 찾음). id 토큰은 서버가 발급한 nonce 에 묶습니다(요청에는 원문의 SHA-256 16진 소문자, replay 방어).
+	/// 사용자가 시트를 닫으면 <c>ResultCodes.Cancelled</c>,
 	/// 그 밖의 실패는 <see cref="AccountResultCodes.PlatformSignInFailed"/> 입니다. iOS 가 아니거나 iOS 12 이하면 실패로 돌려줍니다.
 	/// </para>
 	/// <para>
@@ -24,15 +26,23 @@ namespace Geuneda.Account.Apple
 	{
 		public string Platform => AccountPlatforms.Apple;
 
-		public UniTask<Result<PlatformCredential>> SignInAsync(CancellationToken cancellationToken)
+		public bool RequiresNonce => true;
+
+		/// <exception cref="ArgumentException"><paramref name="nonce"/> 가 비어 있는 경우(<c>AuthService</c> 는 서버에서 받은 nonce 를 넘김)</exception>
+		public UniTask<Result<PlatformCredential>> SignInAsync(string nonce, CancellationToken cancellationToken)
 		{
+			if (string.IsNullOrEmpty(nonce))
+			{
+				throw new ArgumentException("Sign in with Apple needs the nonce issued by the auth server", nameof(nonce));
+			}
+
 			if (cancellationToken.IsCancellationRequested)
 			{
 				return UniTask.FromResult(Result<PlatformCredential>.Fail(ResultCodes.Cancelled));
 			}
 
 #if UNITY_IOS && !UNITY_EDITOR
-			return new AppleSignInRequest().StartAsync(cancellationToken);
+			return new AppleSignInRequest().StartAsync(AppleNonce.Hash(nonce), cancellationToken);
 #else
 			return UniTask.FromResult(Result<PlatformCredential>.Fail(AccountResultCodes.PlatformSignInFailed, "Sign in with Apple is only available on iOS"));
 #endif

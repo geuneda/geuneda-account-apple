@@ -106,11 +106,13 @@ static UIWindow* GeunedaPresentationWindow()
 
 @end
 
-extern "C" void GeunedaAppleSignIn_Start(intptr_t context, GeunedaAppleSignInCallback callback)
+// nonce 는 C# 이 서버 nonce 원문을 SHA-256 16진 소문자로 바꾼 값이다. 애플은 이 값을 id 토큰의 nonce 클레임에 그대로 넣는다
+extern "C" void GeunedaAppleSignIn_Start(intptr_t context, const char* nonce, GeunedaAppleSignInCallback callback)
 {
     if (@available(iOS 13.0, *))
     {
         ASAuthorizationAppleIDRequest* appleIdRequest = [[[ASAuthorizationAppleIDProvider alloc] init] createRequest];
+        appleIdRequest.nonce = [NSString stringWithUTF8String:nonce];
         ASAuthorizationController* controller = [[ASAuthorizationController alloc] initWithAuthorizationRequests:@[ appleIdRequest ]];
         GeunedaAppleSignInRequest* request = [[GeunedaAppleSignInRequest alloc] init];
         request.context = context;
